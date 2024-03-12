@@ -1,6 +1,3 @@
-import sys
-sys.path.append("SmartFarmDataMartAPI")
-
 import concurrent
 import streamlit as st
 import pandas as pd
@@ -9,10 +6,63 @@ import functools
 
 import matplotlib.pyplot as plt
 
-from src.api import SmartFarmAPI
-from codes.appendix import FatrCode
+from SmartFarmDataMartAPI.src.api import SmartFarmAPI
+from SmartFarmDataMartAPI.codes.appendix import FatrCode
 
 from utils import timeit
+
+
+
+# Global instance
+api = SmartFarmAPI("config.yaml")
+
+
+def define_page():
+    st.set_page_config(page_title="이상치 탐지 데모", page_icon="📈")
+    
+    st.markdown("# 이상치 탐지 데모")
+    st.sidebar.header("이상치 탐지 데모")  
+    st.write(
+        """연도, 지역, 품종에 기반하여 실제 농장들에서 수집된 데이터를 기반으로 "내부CO2" 값의 정상치를 시각화합니다. 
+        버튼을 누르면 그래프를 그릴 수 있습니다. 반응형 그래프로 그리고 이상치인지 아닌지를 판별하는 기능을 추가해야 합니다.
+        """
+    )
+    
+    
+    st.title("이상치 탐지 프로토타입")
+    loading_state = st.text("") # 로딩
+    year = st.multiselect("연도", [year for year in range(2015, 2025)], default=[2020, 2021])
+
+    st.subheader('농장 정보')
+
+    try:
+        loading_state.text("데이터 로딩중입니다.")
+        data = getCroppingSeasonDataList(year)
+        data = pd.DataFrame(data)
+        loading_state.text("")
+
+        regions = st.multiselect("지역", data["addressName"].unique(), default=[data.iloc[0]["addressName"]])
+        data = data[data["addressName"].isin(regions)]
+
+        crop_items = st.multiselect("재배 작물", data["itemName"].unique(), default=[data.iloc[0]["itemName"]])
+        data = data[data["itemName"].isin(crop_items)]
+        st.write(data)
+    except:
+        st.write("데이터가 없습니다.")
+
+    st.subheader('시각화 정보')
+    
+    cropSrlNums = data["croppingSerlNo"].astype(int).to_list()
+
+    progress_bar = st.progress(0)
+    progress_status = st.empty()
+    
+    if st.button("시각화 하기 (1분 이상 소요)"):
+        data_famrs = getCroppingSeasonEnvDataList(cropSrlNums)
+        st.pyplot(draw_linegraph_by_category_monthly(data_famrs, "내부CO2"))
+
+
+
 
 
 @st.cache_data()
@@ -42,9 +92,6 @@ def fetch_env_data_for_crop(cropSrlNum):
     return df_env_data
 
 def getCroppingSeasonEnvDataList(cropSrlNums):
-    
-    
-    
     # Use ThreadPoolExecutor to parallelize fetching across different cropSrlNums
     with concurrent.futures.ThreadPoolExecutor() as executor:
         futures = [executor.submit(fetch_env_data_for_crop, cropSrlNum) for cropSrlNum in cropSrlNums]
@@ -118,36 +165,4 @@ def draw_linegraph_by_category_monthly(data, category):
 
 
 if __name__ == "__main__":
-    api = SmartFarmAPI("config.yaml")
-    
-    st.title("이상치 탐지 프로토타입")
-    loading_state = st.text("") # 로딩
-    year = st.multiselect("연도", [year for year in range(2015, 2025)], default=[2020, 2021])
-
-    st.subheader('농장 정보')
-
-    try:
-        loading_state.text("데이터 로딩중입니다.")
-        data = getCroppingSeasonDataList(year)
-        data = pd.DataFrame(data)
-        loading_state.text("")
-
-        regions = st.multiselect("지역", data["addressName"].unique(), default=[data.iloc[0]["addressName"]])
-        data = data[data["addressName"].isin(regions)]
-
-        crop_items = st.multiselect("재배 작물", data["itemName"].unique(), default=[data.iloc[0]["itemName"]])
-        data = data[data["itemName"].isin(crop_items)]
-        st.write(data)
-    except:
-        st.write("데이터가 없습니다.")
-
-    st.subheader('시각화 정보')
-    
-    cropSrlNums = data["croppingSerlNo"].astype(int).to_list()
-
-    progress_bar = st.progress(0)
-    progress_status = st.empty()
-    
-    if st.button("시각화 하기 (1분 이상 소요)"):
-        data_famrs = getCroppingSeasonEnvDataList(cropSrlNums)
-        st.pyplot(draw_linegraph_by_category_monthly(data_famrs, "내부CO2"))
+    define_page()
