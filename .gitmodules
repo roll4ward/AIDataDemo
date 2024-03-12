@@ -1,0 +1,3 @@
+[submodule "SmartFarmDataMartAPI"]
+	path = SmartFarmDataMartAPI
+	url = https://github.com/roll4ward/SmartFarmDataMartAPI.git
